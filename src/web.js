@@ -4,11 +4,14 @@ const helmet = require('helmet');
 const cookieParser = require('cookie-parser');
 const { httpLogger, logger } = require('./services/logger');
 const { calculateInvoice } = require('./services/calculations');
-const { initDB, saveInvoice, getInvoicesByOwner, getInvoiceById, pool } = require('./services/db');
+const { initDB, saveInvoice, getInvoicesByOwner, getInvoiceById, upsertProfile, getProfileByEmail, pool } = require('./services/db');
 const { generatePDF } = require('./services/pdf');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// Helpers
+const delay = ms => new Promise(res => setTimeout(res, ms));
 
 // Environment Validation
 if (!process.env.DATABASE_URL) {
@@ -42,8 +45,18 @@ app.get('/health', (req, res) => {
   res.status(200).json({ status: 'OK', timestamp: new Date().toISOString() });
 });
 
-app.get('/', (req, res) => {
-  res.render('index');
+app.get('/', async (req, res) => {
+  try {
+    const email = req.cookies.user_email;
+    let profile = null;
+    if (email) {
+      profile = await getProfileByEmail(email);
+    }
+    res.render('index', { profile });
+  } catch (error) {
+    logger.error('Error loading dashboard:', error);
+    res.render('index', { profile: null });
+  }
 });
 
 app.get('/past-invoices', async (req, res) => {
@@ -57,6 +70,40 @@ app.get('/past-invoices', async (req, res) => {
   } catch (error) {
     logger.error('Error fetching past invoices:', error);
     res.status(500).send('An error occurred while fetching your history.');
+  }
+});
+
+app.get('/settings', async (req, res) => {
+  try {
+    const email = req.cookies.user_email;
+    if (!email) {
+      return res.redirect('/');
+    }
+    const profile = await getProfileByEmail(email);
+    res.render('settings', { profile, email });
+  } catch (error) {
+    logger.error('Error fetching settings:', error);
+    res.status(500).send('An error occurred while fetching settings.');
+  }
+});
+
+app.post('/settings', async (req, res) => {
+  try {
+    const email = req.cookies.user_email;
+    if (!email) {
+      return res.status(401).send('Unauthorized');
+    }
+    const { companyName, companyDetails, taxRate } = req.body;
+    await upsertProfile({
+      email,
+      company_name: companyName,
+      company_details: companyDetails,
+      default_tax_rate: parseFloat(taxRate) || 0
+    });
+    res.redirect('/settings?success=1');
+  } catch (error) {
+    logger.error('Error saving settings:', error);
+    res.status(500).send('An error occurred while saving settings.');
   }
 });
 
@@ -106,6 +153,11 @@ app.post('/generate', async (req, res) => {
 
     // Generate PDF
     const pdfBuffer = await generatePDF(invoice);
+
+    // Artificial delay for user feedback (only in non-test environments)
+    if (process.env.NODE_ENV !== 'test') {
+      await delay(3000);
+    }
 
     // Stream PDF response
     res.setHeader('Content-Type', 'application/pdf');

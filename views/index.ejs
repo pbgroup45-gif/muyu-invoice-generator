@@ -80,9 +80,9 @@
 
     <div class="flex h-screen bg-background" 
          x-data="{ 
-            companyName: '', 
-            companyDetails: '', 
-            taxRate: '', 
+            invoiceCompanyName: `<%- profile ? profile.company_name.replace(/`/g, '\\`').replace(/\${/g, '\\${') : '' %>`, 
+            invoiceCompanyDetails: `<%- profile ? profile.company_details.replace(/`/g, '\\`').replace(/\${/g, '\\${') : '' %>`, 
+            invoiceTaxRate: '<%= profile ? profile.default_tax_rate : '' %>', 
             expenses: [{ id: Date.now(), description: '', cost: '' }],
             addExpense() {
                 this.expenses.push({ id: Date.now(), description: '', cost: '' });
@@ -101,10 +101,15 @@
                 return this.expenses.reduce((sum, e) => sum + (parseFloat(e.cost) || 0), 0);
             },
             get taxAmount() {
-                return (this.subtotal * (parseFloat(this.taxRate) || 0)) / 100;
+                return (this.subtotal * (parseFloat(this.invoiceTaxRate) || 0)) / 100;
             },
             get total() {
                 return this.subtotal + this.taxAmount;
+            },
+            isGenerating: false,
+            submitForm() {
+                this.isGenerating = true;
+                setTimeout(() => { this.isGenerating = false; }, 5000);
             }
          }"
          x-init="if (window.lucide) { lucide.createIcons(); } else { console.error('Lucide not loaded'); }">
@@ -133,10 +138,10 @@
                         </a>
                     </li>
                     <li>
-                        <button class="w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent transition-colors">
+                        <a href="/settings" class="w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent transition-colors">
                             <i data-lucide="settings" class="size-4"></i>
                             <span>Settings</span>
-                        </button>
+                        </a>
                     </li>
                 </ul>
             </nav>
@@ -157,7 +162,7 @@
                 </div>
 
                 <div class="rounded-xl border bg-card text-card-foreground shadow border-border p-8">
-                    <form action="/generate" method="POST" class="space-y-8">
+                    <form action="/generate" method="POST" class="space-y-8" @submit="submitForm">
                         <!-- Company Information -->
                         <div class="space-y-6">
                             <div>
@@ -170,7 +175,7 @@
                                     Company Name
                                 </label>
                                 <input class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 bg-input border-border text-foreground placeholder:text-muted-foreground focus:border-ring" 
-                                       id="companyName" name="companyName" x-model="companyName" placeholder="Enter company name" required />
+                                       id="companyName" name="companyName" x-model="invoiceCompanyName" placeholder="Enter company name" required />
                             </div>
 
                             <div class="space-y-2">
@@ -178,7 +183,7 @@
                                     Company Details
                                 </label>
                                 <textarea class="flex min-h-[60px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-base shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 bg-input border-border text-foreground placeholder:text-muted-foreground focus:border-ring min-h-[100px]" 
-                                          id="companyDetails" name="companyDetails" x-model="companyDetails" placeholder="Enter company address, contact info, etc." required></textarea>
+                                          id="companyDetails" name="companyDetails" x-model="invoiceCompanyDetails" placeholder="Enter company address, contact info, etc." required></textarea>
                             </div>
                         </div>
 
@@ -197,7 +202,7 @@
 
                             <div class="space-y-3">
                                 <template x-for="(expense, index) in expenses" :key="expense.id">
-                                    <div class="flex gap-3 items-end p-4 rounded-lg bg-secondary border border-border">
+                                    <div class="flex gap-3 items-end p-4 rounded-lg bg-muted/20 border border-border/50 hover:border-border transition-colors">
                                         <div class="flex-1 space-y-2">
                                             <label class="text-xs text-muted-foreground">Description</label>
                                             <input class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 bg-input border-border text-foreground placeholder:text-muted-foreground focus:border-ring" 
@@ -233,33 +238,51 @@
                                         Tax Rate (%)
                                     </label>
                                     <input class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 bg-input border-border text-foreground placeholder:text-muted-foreground focus:border-ring" 
-                                           id="taxRate" name="taxRate" type="number" step="0.01" min="0" max="100" x-model="taxRate" placeholder="0.00" required />
+                                           id="taxRate" name="taxRate" type="number" step="0.01" min="0" max="100" x-model="invoiceTaxRate" placeholder="0.00" required />
                                 </div>
                             </div>
-                        </div>
+                            </div>
 
-                        <!-- Summary -->
-                        <div class="space-y-4 p-6 rounded-lg bg-secondary border border-border">
-                            <div class="flex justify-between text-sm">
-                                <span class="text-muted-foreground">Subtotal</span>
-                                <span class="text-foreground font-mono" x-text="'$' + subtotal.toFixed(2)"></span>
+                            <!-- Summary -->
+                            <div class="space-y-4 p-6 rounded-lg bg-background/50 border border-border shadow-inner">
+                                <div class="flex justify-between text-sm">
+                                    <span class="text-muted-foreground">Subtotal</span>
+                                    <span class="text-foreground font-mono" x-text="'$' + subtotal.toFixed(2)"></span>
+                                </div>
+                                <div class="flex justify-between text-sm">
+                                    <span class="text-muted-foreground" x-text="'Tax (' + (invoiceTaxRate || 0) + '%)'"></span>
+                                    <span class="text-foreground font-mono" x-text="'$' + taxAmount.toFixed(2)"></span>
+                                </div>
+                                <div class="shrink-0 bg-border h-[1px] w-full bg-accent/20"></div>
+                                <div class="flex justify-between">
+                                    <span class="text-foreground">Total</span>
+                                    <span class="text-xl text-accent font-mono" x-text="'$' + total.toFixed(2)"></span>
+                                </div>
                             </div>
-                            <div class="flex justify-between text-sm">
-                                <span class="text-muted-foreground" x-text="'Tax (' + (taxRate || 0) + '%)'"></span>
-                                <span class="text-foreground font-mono" x-text="'$' + taxAmount.toFixed(2)"></span>
-                            </div>
-                            <div data-orientation="horizontal" role="none" class="shrink-0 bg-border h-[1px] w-full bg-border"></div>
-                            <div class="flex justify-between">
-                                <span class="text-foreground">Total</span>
-                                <span class="text-xl text-accent font-mono" x-text="'$' + total.toFixed(2)"></span>
-                            </div>
-                        </div>
 
                         <!-- Submit Button -->
                         <div class="flex justify-end pt-4">
-                            <button type="submit" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground shadow hover:bg-primary/90 h-11 px-8">
-                                <i data-lucide="receipt" class="size-4 mr-2"></i>
-                                Generate Invoice
+                            <button type="submit" 
+                                    :disabled="isGenerating"
+                                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground shadow hover:bg-primary/90 h-12"
+                                    style="padding-left: 4rem; padding-right: 4rem; cursor: pointer;">
+                                
+                                <template x-if="!isGenerating">
+                                    <div class="flex items-center">
+                                        <i data-lucide="receipt" class="size-4 mr-2"></i>
+                                        <span>Generate Invoice</span>
+                                    </div>
+                                </template>
+
+                                <template x-if="isGenerating">
+                                    <div class="flex items-center">
+                                        <svg class="animate-spin -ml-1 mr-3 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                        </svg>
+                                        <span>Generating...</span>
+                                    </div>
+                                </template>
                             </button>
                         </div>
                     </form>
