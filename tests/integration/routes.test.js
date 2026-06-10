@@ -1,351 +1,359 @@
-const request = require('supertest');
-const { app } = require('../../src/web');
-const { 
-  saveInvoice, 
-  getInvoicesByOwner, 
-  getInvoiceById, 
-  getProfileByEmail, 
-  upsertProfile,
-  pool 
-} = require('../../src/services/db');
-const { generatePDF } = require('../../src/services/pdf');
-const { logger } = require('../../src/services/logger');
+const request = require("supertest");
+const { app } = require("../../src/web");
+const {
+	saveInvoice,
+	getInvoicesByOwner,
+	getInvoiceById,
+	getProfileByEmail,
+	upsertProfile,
+	pool,
+} = require("../../src/services/db");
+const { generatePDF } = require("../../src/services/pdf");
+const { logger } = require("../../src/services/logger");
 
-jest.mock('../../src/services/db');
-jest.mock('../../src/services/pdf');
+jest.mock("../../src/services/db");
+jest.mock("../../src/services/pdf");
 
-describe('API Routes', () => {
-  afterAll(async () => {
-    await pool.end();
-  });
+describe("API Routes", () => {
+	afterAll(async () => {
+		await pool.end();
+	});
 
-  test('should have cookie-parser middleware configured', async () => {
-    const hasCookieParser = app._router.stack.some(layer => layer.name === 'cookieParser');
-    expect(hasCookieParser).toBe(true);
-  });
+	test("should have cookie-parser middleware configured", async () => {
+		const hasCookieParser = app._router.stack.some(
+			(layer) => layer.name === "cookieParser",
+		);
+		expect(hasCookieParser).toBe(true);
+	});
 
-  describe('GET /health', () => {
-    test('should return 200 OK', async () => {
-      const response = await request(app).get('/health');
-      expect(response.status).toBe(200);
-      expect(response.body.status).toBe('OK');
-    });
-  });
+	describe("GET /health", () => {
+		test("should return 200 OK", async () => {
+			const response = await request(app).get("/health");
+			expect(response.status).toBe(200);
+			expect(response.body.status).toBe("OK");
+		});
+	});
 
-  describe('GET /', () => {
-    test('should return 200 OK and HTML', async () => {
-      const response = await request(app).get('/');
-      expect(response.status).toBe(200);
-      expect(response.type).toBe('text/html');
-    });
+	describe("GET /", () => {
+		test("should return 200 OK and HTML", async () => {
+			const response = await request(app).get("/");
+			expect(response.status).toBe(200);
+			expect(response.type).toBe("text/html");
+		});
 
-    test('should include profile defaults if they exist', async () => {
-      const email = 'prefill@test.com';
-      const mockProfile = { 
-        email, 
-        company_name: 'Prefill Co', 
-        company_details: 'Prefill Details',
-        default_tax_rate: 20 
-      };
-      getProfileByEmail.mockResolvedValue(mockProfile);
+		test("should include profile defaults if they exist", async () => {
+			const email = "prefill@test.com";
+			const mockProfile = {
+				email,
+				company_name: "Prefill Co",
+				company_details: "Prefill Details",
+				default_tax_rate: 20,
+			};
+			getProfileByEmail.mockResolvedValue(mockProfile);
 
-      const response = await request(app)
-        .get('/')
-        .set('Cookie', [`user_email=${email}`]);
-      
-      expect(response.text).toContain('Prefill Co');
-      expect(response.text).toContain('Prefill Details');
-    });
+			const response = await request(app)
+				.get("/")
+				.set("Cookie", [`user_email=${email}`]);
 
-    test('should return 200 even if profile fetch fails', async () => {
-      const email = 'error@test.com';
-      getProfileByEmail.mockRejectedValue(new Error('DB Error'));
-      const errorSpy = jest.spyOn(logger, 'error').mockImplementation(() => {});
+			expect(response.text).toContain("Prefill Co");
+			expect(response.text).toContain("Prefill Details");
+		});
 
-      const response = await request(app)
-        .get('/')
-        .set('Cookie', [`user_email=${email}`]);
-      
-      expect(response.status).toBe(200);
-      expect(errorSpy).toHaveBeenCalled();
-      errorSpy.mockRestore();
-    });
-  });
+		test("should return 200 even if profile fetch fails", async () => {
+			const email = "error@test.com";
+			getProfileByEmail.mockRejectedValue(new Error("DB Error"));
+			const errorSpy = jest.spyOn(logger, "error").mockImplementation(() => {});
 
-  describe('POST /generate', () => {
-    test('should return 200 and PDF buffer on success', async () => {
-      const mockInvoice = { id: 1, company_name: 'Test', items: [] };
-      saveInvoice.mockResolvedValue(mockInvoice);
-      generatePDF.mockResolvedValue(Buffer.from('pdf content'));
+			const response = await request(app)
+				.get("/")
+				.set("Cookie", [`user_email=${email}`]);
 
-      const response = await request(app)
-        .post('/generate')
-        .type('form')
-        .send({
-          companyName: 'Test Co',
-          taxRate: '10',
-          'expenses[0][description]': 'Item 1',
-          'expenses[0][cost]': '100'
-        });
+			expect(response.status).toBe(200);
+			expect(errorSpy).toHaveBeenCalled();
+			errorSpy.mockRestore();
+		});
+	});
 
-      expect(response.status).toBe(200);
-      expect(response.header['content-type']).toBe('application/pdf');
-      expect(response.header['content-disposition']).toContain('invoice-1.pdf');
-    });
+	describe("POST /generate", () => {
+		test("should return 200 and PDF buffer on success", async () => {
+			const mockInvoice = { id: 1, company_name: "Test", items: [] };
+			saveInvoice.mockResolvedValue(mockInvoice);
+			generatePDF.mockResolvedValue(Buffer.from("pdf content"));
 
-    test('should return 400 if expenses are missing', async () => {
-      const response = await request(app)
-        .post('/generate')
-        .type('form')
-        .send({ companyName: 'Test Co' });
+			const response = await request(app).post("/generate").type("form").send({
+				companyName: "Test Co",
+				taxRate: "10",
+				"expenses[0][description]": "Item 1",
+				"expenses[0][cost]": "100",
+			});
 
-      expect(response.status).toBe(400);
-    });
+			expect(response.status).toBe(200);
+			expect(response.header["content-type"]).toBe("application/pdf");
+			expect(response.header["content-disposition"]).toContain("invoice-1.pdf");
+		});
 
-    test('should return 500 if saveInvoice fails', async () => {
-      saveInvoice.mockRejectedValue(new Error('DB Error'));
-      const errorSpy = jest.spyOn(logger, 'error').mockImplementation(() => {});
+		test("should return 400 if expenses are missing", async () => {
+			const response = await request(app)
+				.post("/generate")
+				.type("form")
+				.send({ companyName: "Test Co" });
 
-      const response = await request(app)
-        .post('/generate')
-        .type('form')
-        .send({
-          companyName: 'Test Co',
-          'expenses[0][description]': 'Item 1',
-          'expenses[0][cost]': '100'
-        });
+			expect(response.status).toBe(400);
+		});
 
-      expect(response.status).toBe(500);
-      expect(errorSpy).toHaveBeenCalled();
-      errorSpy.mockRestore();
-    });
+		test("should return 500 if saveInvoice fails", async () => {
+			saveInvoice.mockRejectedValue(new Error("DB Error"));
+			const errorSpy = jest.spyOn(logger, "error").mockImplementation(() => {});
 
-    test('should save owner_email from user_email cookie', async () => {
-      const email = 'tester@example.com';
-      const mockInvoice = { id: 1, company_name: 'Test', items: [], owner_email: email };
-      saveInvoice.mockResolvedValue(mockInvoice);
-      generatePDF.mockResolvedValue(Buffer.from('pdf content'));
+			const response = await request(app).post("/generate").type("form").send({
+				companyName: "Test Co",
+				"expenses[0][description]": "Item 1",
+				"expenses[0][cost]": "100",
+			});
 
-      const response = await request(app)
-        .post('/generate')
-        .set('Cookie', [`user_email=${email}`])
-        .type('form')
-        .send({
-          companyName: 'Test Co',
-          taxRate: '10',
-          'expenses[0][description]': 'Item 1',
-          'expenses[0][cost]': '100'
-        });
+			expect(response.status).toBe(500);
+			expect(errorSpy).toHaveBeenCalled();
+			errorSpy.mockRestore();
+		});
 
-      expect(response.status).toBe(200);
-      expect(saveInvoice).toHaveBeenCalledWith(expect.objectContaining({
-        owner_email: email
-      }));
-    });
-  });
+		test("should save owner_email from user_email cookie", async () => {
+			const email = "tester@example.com";
+			const mockInvoice = {
+				id: 1,
+				company_name: "Test",
+				items: [],
+				owner_email: email,
+			};
+			saveInvoice.mockResolvedValue(mockInvoice);
+			generatePDF.mockResolvedValue(Buffer.from("pdf content"));
 
-  describe('GET /past-invoices', () => {
-    test('should redirect to / if user_email cookie is missing', async () => {
-      const response = await request(app).get('/past-invoices');
-      expect(response.status).toBe(302);
-      expect(response.header.location).toBe('/');
-    });
+			const response = await request(app)
+				.post("/generate")
+				.set("Cookie", [`user_email=${email}`])
+				.type("form")
+				.send({
+					companyName: "Test Co",
+					taxRate: "10",
+					"expenses[0][description]": "Item 1",
+					"expenses[0][cost]": "100",
+				});
 
-    test('should return 200 and list invoices for valid user_email', async () => {
-      const email = 'history@test.com';
-      const mockInvoices = [{ id: 1, company_name: 'History Co', owner_email: email }];
-      getInvoicesByOwner.mockResolvedValue(mockInvoices);
+			expect(response.status).toBe(200);
+			expect(saveInvoice).toHaveBeenCalledWith(
+				expect.objectContaining({
+					owner_email: email,
+				}),
+			);
+		});
+	});
 
-      const response = await request(app)
-        .get('/past-invoices')
-        .set('Cookie', [`user_email=${email}`]);
+	describe("GET /past-invoices", () => {
+		test("should redirect to / if user_email cookie is missing", async () => {
+			const response = await request(app).get("/past-invoices");
+			expect(response.status).toBe(302);
+			expect(response.header.location).toBe("/");
+		});
 
-      expect(response.status).toBe(200);
-      expect(getInvoicesByOwner).toHaveBeenCalledWith(email);
-    });
+		test("should return 200 and list invoices for valid user_email", async () => {
+			const email = "history@test.com";
+			const mockInvoices = [
+				{ id: 1, company_name: "History Co", owner_email: email },
+			];
+			getInvoicesByOwner.mockResolvedValue(mockInvoices);
 
-    test('should return 500 if database fails', async () => {
-      getInvoicesByOwner.mockRejectedValue(new Error('DB Error'));
-      const errorSpy = jest.spyOn(logger, 'error').mockImplementation(() => {});
+			const response = await request(app)
+				.get("/past-invoices")
+				.set("Cookie", [`user_email=${email}`]);
 
-      const response = await request(app)
-        .get('/past-invoices')
-        .set('Cookie', ['user_email=test@test.com']);
-      
-      expect(response.status).toBe(500);
-      expect(errorSpy).toHaveBeenCalled();
-      errorSpy.mockRestore();
-    });
-  });
+			expect(response.status).toBe(200);
+			expect(getInvoicesByOwner).toHaveBeenCalledWith(email);
+		});
 
-  describe('GET /download/:id', () => {
-    test('should return 404 if invoice not found', async () => {
-      getInvoiceById.mockResolvedValue(null);
+		test("should return 500 if database fails", async () => {
+			getInvoicesByOwner.mockRejectedValue(new Error("DB Error"));
+			const errorSpy = jest.spyOn(logger, "error").mockImplementation(() => {});
 
-      const response = await request(app)
-        .get('/download/999')
-        .set('Cookie', ['user_email=test@test.com']);
-      
-      expect(response.status).toBe(404);
-    });
+			const response = await request(app)
+				.get("/past-invoices")
+				.set("Cookie", ["user_email=test@test.com"]);
 
-    test('should return 403 if owner mismatch', async () => {
-      getInvoiceById.mockResolvedValue({ id: 1, owner_email: 'owner@test.com' });
+			expect(response.status).toBe(500);
+			expect(errorSpy).toHaveBeenCalled();
+			errorSpy.mockRestore();
+		});
+	});
 
-      const response = await request(app)
-        .get('/download/1')
-        .set('Cookie', ['user_email=hacker@test.com']);
-      
-      expect(response.status).toBe(403);
-    });
+	describe("GET /download/:id", () => {
+		test("should return 404 if invoice not found", async () => {
+			getInvoiceById.mockResolvedValue(null);
 
-    test('should return 200 and PDF if owner matches', async () => {
-      const email = 'owner@test.com';
-      getInvoiceById.mockResolvedValue({ id: 1, owner_email: email, items: [] });
-      generatePDF.mockResolvedValue(Buffer.from('pdf content'));
+			const response = await request(app)
+				.get("/download/999")
+				.set("Cookie", ["user_email=test@test.com"]);
 
-      const response = await request(app)
-        .get('/download/1')
-        .set('Cookie', [`user_email=${email}`]);
-      
-      expect(response.status).toBe(200);
-      expect(response.header['content-type']).toBe('application/pdf');
-    });
+			expect(response.status).toBe(404);
+		});
 
-    test('should return 500 if download fails', async () => {
-      getInvoiceById.mockRejectedValue(new Error('DB Error'));
-      const errorSpy = jest.spyOn(logger, 'error').mockImplementation(() => {});
+		test("should return 403 if owner mismatch", async () => {
+			getInvoiceById.mockResolvedValue({
+				id: 1,
+				owner_email: "owner@test.com",
+			});
 
-      const response = await request(app)
-        .get('/download/1')
-        .set('Cookie', ['user_email=owner@test.com']);
-      
-      expect(response.status).toBe(500);
-      expect(errorSpy).toHaveBeenCalled();
-      errorSpy.mockRestore();
-    });
-  });
+			const response = await request(app)
+				.get("/download/1")
+				.set("Cookie", ["user_email=hacker@test.com"]);
 
-  describe('Settings Routes', () => {
-    test('GET /settings should redirect to / if no user_email cookie', async () => {
-      const response = await request(app).get('/settings');
-      expect(response.status).toBe(302);
-      expect(response.header.location).toBe('/');
-    });
+			expect(response.status).toBe(403);
+		});
 
-    test('GET /settings should return 200 if user_email cookie exists', async () => {
-      const email = 'settings@test.com';
-      getProfileByEmail.mockResolvedValue(null);
+		test("should return 200 and PDF if owner matches", async () => {
+			const email = "owner@test.com";
+			getInvoiceById.mockResolvedValue({
+				id: 1,
+				owner_email: email,
+				items: [],
+			});
+			generatePDF.mockResolvedValue(Buffer.from("pdf content"));
 
-      const response = await request(app)
-        .get('/settings')
-        .set('Cookie', [`user_email=${email}`]);
-      
-      expect(response.status).toBe(200);
-      expect(response.type).toBe('text/html');
-    });
+			const response = await request(app)
+				.get("/download/1")
+				.set("Cookie", [`user_email=${email}`]);
 
-    test('POST /settings should save profile and redirect', async () => {
-      const email = 'settings@test.com';
-      upsertProfile.mockResolvedValue({ email });
+			expect(response.status).toBe(200);
+			expect(response.header["content-type"]).toBe("application/pdf");
+		});
 
-      const response = await request(app)
-        .post('/settings')
-        .set('Cookie', [`user_email=${email}`])
-        .type('form')
-        .send({ 
-          companyName: 'New Co', 
-          companyDetails: 'New Details', 
-          taxRate: '12' 
-        });
-      
-      expect(response.status).toBe(302);
-      expect(response.header.location).toBe('/settings?success=1');
-      expect(upsertProfile).toHaveBeenCalledWith(expect.objectContaining({
-        email,
-        company_name: 'New Co',
-        company_details: 'New Details',
-        default_tax_rate: 12
-      }));
-    });
+		test("should return 500 if download fails", async () => {
+			getInvoiceById.mockRejectedValue(new Error("DB Error"));
+			const errorSpy = jest.spyOn(logger, "error").mockImplementation(() => {});
 
-    test('POST /settings should return 401 if no user_email cookie', async () => {
-      const response = await request(app)
-        .post('/settings')
-        .type('form')
-        .send({ companyName: 'Hacker Co' });
-      
-      expect(response.status).toBe(401);
-    });
+			const response = await request(app)
+				.get("/download/1")
+				.set("Cookie", ["user_email=owner@test.com"]);
 
-    test('GET /settings should return 500 if database fails', async () => {
-      const email = 'error@test.com';
-      getProfileByEmail.mockRejectedValue(new Error('DB Error'));
-      const errorSpy = jest.spyOn(logger, 'error').mockImplementation(() => {});
+			expect(response.status).toBe(500);
+			expect(errorSpy).toHaveBeenCalled();
+			errorSpy.mockRestore();
+		});
+	});
 
-      const response = await request(app)
-        .get('/settings')
-        .set('Cookie', [`user_email=${email}`]);
-      
-      expect(response.status).toBe(500);
-      errorSpy.mockRestore();
-    });
+	describe("Settings Routes", () => {
+		test("GET /settings should redirect to / if no user_email cookie", async () => {
+			const response = await request(app).get("/settings");
+			expect(response.status).toBe(302);
+			expect(response.header.location).toBe("/");
+		});
 
-    test('POST /settings should return 500 if upsert fails', async () => {
-      const email = 'error@test.com';
-      upsertProfile.mockRejectedValue(new Error('DB Error'));
-      const errorSpy = jest.spyOn(logger, 'error').mockImplementation(() => {});
+		test("GET /settings should return 200 if user_email cookie exists", async () => {
+			const email = "settings@test.com";
+			getProfileByEmail.mockResolvedValue(null);
 
-      const response = await request(app)
-        .post('/settings')
-        .set('Cookie', [`user_email=${email}`])
-        .type('form')
-        .send({ companyName: 'Fail Co' });
-      
-      expect(response.status).toBe(500);
-      errorSpy.mockRestore();
-    });
-  });
+			const response = await request(app)
+				.get("/settings")
+				.set("Cookie", [`user_email=${email}`]);
 
-  describe('POST /generate errors', () => {
-    test('should return 500 if PDF generation fails', async () => {
-      saveInvoice.mockResolvedValue({ id: 1, company_name: 'Test', items: [] });
-      generatePDF.mockRejectedValue(new Error('PDF Error'));
-      const errorSpy = jest.spyOn(logger, 'error').mockImplementation(() => {});
+			expect(response.status).toBe(200);
+			expect(response.type).toBe("text/html");
+		});
 
-      const response = await request(app)
-        .post('/generate')
-        .type('form')
-        .send({
-          companyName: 'Test Co',
-          'expenses[0][description]': 'Item 1',
-          'expenses[0][cost]': '100'
-        });
+		test("POST /settings should save profile and redirect", async () => {
+			const email = "settings@test.com";
+			upsertProfile.mockResolvedValue({ email });
 
-      expect(response.status).toBe(500);
-      expect(errorSpy).toHaveBeenCalled();
-      errorSpy.mockRestore();
-    });
+			const response = await request(app)
+				.post("/settings")
+				.set("Cookie", [`user_email=${email}`])
+				.type("form")
+				.send({
+					companyName: "New Co",
+					companyDetails: "New Details",
+					taxRate: "12",
+				});
 
-    test('should hit delay branch if NODE_ENV is not test', async () => {
-      const originalEnv = process.env.NODE_ENV;
-      process.env.NODE_ENV = 'production';
-      
-      const mockInvoice = { id: 1, company_name: 'Delay Test', items: [] };
-      saveInvoice.mockResolvedValue(mockInvoice);
-      generatePDF.mockResolvedValue(Buffer.from('pdf content'));
+			expect(response.status).toBe(302);
+			expect(response.header.location).toBe("/settings?success=1");
+			expect(upsertProfile).toHaveBeenCalledWith(
+				expect.objectContaining({
+					email,
+					company_name: "New Co",
+					company_details: "New Details",
+					default_tax_rate: 12,
+				}),
+			);
+		});
 
-      const response = await request(app)
-        .post('/generate')
-        .type('form')
-        .send({
-          companyName: 'Delay Co',
-          'expenses[0][description]': 'Item 1',
-          'expenses[0][cost]': '100'
-        });
+		test("POST /settings should return 401 if no user_email cookie", async () => {
+			const response = await request(app)
+				.post("/settings")
+				.type("form")
+				.send({ companyName: "Hacker Co" });
 
-      expect(response.status).toBe(200);
-      process.env.NODE_ENV = originalEnv;
-    });
-  });
+			expect(response.status).toBe(401);
+		});
+
+		test("GET /settings should return 500 if database fails", async () => {
+			const email = "error@test.com";
+			getProfileByEmail.mockRejectedValue(new Error("DB Error"));
+			const errorSpy = jest.spyOn(logger, "error").mockImplementation(() => {});
+
+			const response = await request(app)
+				.get("/settings")
+				.set("Cookie", [`user_email=${email}`]);
+
+			expect(response.status).toBe(500);
+			errorSpy.mockRestore();
+		});
+
+		test("POST /settings should return 500 if upsert fails", async () => {
+			const email = "error@test.com";
+			upsertProfile.mockRejectedValue(new Error("DB Error"));
+			const errorSpy = jest.spyOn(logger, "error").mockImplementation(() => {});
+
+			const response = await request(app)
+				.post("/settings")
+				.set("Cookie", [`user_email=${email}`])
+				.type("form")
+				.send({ companyName: "Fail Co" });
+
+			expect(response.status).toBe(500);
+			errorSpy.mockRestore();
+		});
+	});
+
+	describe("POST /generate errors", () => {
+		test("should return 500 if PDF generation fails", async () => {
+			saveInvoice.mockResolvedValue({ id: 1, company_name: "Test", items: [] });
+			generatePDF.mockRejectedValue(new Error("PDF Error"));
+			const errorSpy = jest.spyOn(logger, "error").mockImplementation(() => {});
+
+			const response = await request(app).post("/generate").type("form").send({
+				companyName: "Test Co",
+				"expenses[0][description]": "Item 1",
+				"expenses[0][cost]": "100",
+			});
+
+			expect(response.status).toBe(500);
+			expect(errorSpy).toHaveBeenCalled();
+			errorSpy.mockRestore();
+		});
+
+		test("should hit delay branch if NODE_ENV is not test", async () => {
+			const originalEnv = process.env.NODE_ENV;
+			process.env.NODE_ENV = "production";
+
+			const mockInvoice = { id: 1, company_name: "Delay Test", items: [] };
+			saveInvoice.mockResolvedValue(mockInvoice);
+			generatePDF.mockResolvedValue(Buffer.from("pdf content"));
+
+			const response = await request(app).post("/generate").type("form").send({
+				companyName: "Delay Co",
+				"expenses[0][description]": "Item 1",
+				"expenses[0][cost]": "100",
+			});
+
+			expect(response.status).toBe(200);
+			process.env.NODE_ENV = originalEnv;
+		});
+	});
 });
