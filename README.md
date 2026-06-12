@@ -9,17 +9,18 @@ Before running the application, ensure you have the following tools installed:
 - **Node.js**: v24.16.0 (Environment managed via [mise](https://mise.jdx.dev/))
 - **Docker & Docker Compose**: Required for containerized database orchestration.
 - **Trivy**: (Optional) For dependency security scanning.
+- **Packer**: For AMI creation.
+- **ShellCheck**: For shell script linting.
 
 ## Tech Stack
 
 - **Backend**: Node.js, Express.js
-- **Tooling**: Biome (Linter/Formatter)
+- **Tooling**: Biome (Linter/Formatter), `mise` (Environment & Task management)
 - **Templating**: EJS
 - **Frontend Interactivity**: Alpine.js (Lightweight reactive state)
 - **Styling**: Tailwind CSS (Pre-compiled)
 - **Database**: PostgreSQL (via `pg` client)
 - **PDF Generation**: PDFKit (Streamed responses)
-- **Security**: Helmet.js (CSP and Secure Headers)
 - **Logging**: Morgan (Human-readable, searchable text logs)
 
 ## Getting Started
@@ -31,7 +32,7 @@ docker-compose up -d
 ```
 
 ### 2. Environment Configuration
-The application requires the following environment variables. These are pre-configured in `mise.toml` for local development.
+The application requires the following environment variables.
 
 | Variable | Description | Default |
 | :--- | :--- | :--- |
